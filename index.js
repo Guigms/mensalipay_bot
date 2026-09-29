@@ -5,11 +5,20 @@ const qrcode = require('qrcode-terminal');
 const app = express();
 app.use(express.json());
 
-// Configuração do WhatsApp com argumentos essenciais para servidores Linux (Render)
+// Configuração do WhatsApp com argumentos extremos de otimização para o Render (512MB RAM)
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // Crucial para não esgotar a memória do Render
+            '--disable-gpu'
+        ]
     },
     webVersionCache: {
         type: 'remote',
@@ -17,10 +26,15 @@ const client = new Client({
     }
 });
 
-// Gera o QR Code no terminal do Render para tu leres com o telemóvel
+// Gera o QR Code no terminal do Render para leres com o telemóvel
 client.on('qr', (qr) => {
     qrcode.generate(qr, { small: true });
     console.log('Escaneia este QR Code com o teu WhatsApp');
+});
+
+// Evento de feedback assim que o telemóvel lê o QR Code
+client.on('authenticated', () => {
+    console.log('Autenticado com sucesso! A iniciar sincronização (pode demorar uns minutos)...');
 });
 
 client.on('ready', () => {
@@ -41,6 +55,7 @@ app.post('/api/send', async (req, res) => {
         await client.sendMessage(chatId, message);
         res.status(200).json({ success: true, message: 'Notificação enviada!' });
     } catch (error) {
+        console.error('Erro ao enviar mensagem:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
